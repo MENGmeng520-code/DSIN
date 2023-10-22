@@ -10,18 +10,31 @@ _HARD_SIGMA = 1e7
 
 def create_centers_variable(config):  # (C, L) or (L,)
     assert config.num_centers is not None
-    return tf.get_variable(
+    return tf.compat.v1.get_variable(
         'centers', shape=(config.num_centers,), dtype=tf.float32,
         initializer=_get_centers_initializer(config))
 
 
+# def create_centers_regularization_term(config, centers):
+#     # Add centers regularization
+#     if config.regularization_factor_centers != 0:
+#         with tf.name_scope('centers/Regularizer'):  # following slim's naming convention
+#             reg = tf.compat.v1.to_float(config.regularization_factor_centers)
+#             centers_reg = tf.identity(reg * tf.nn.l2_loss(centers), name='l2_regularizer')
+#             tf.losses.add_loss(centers_reg, tf.GraphKeys.REGULARIZATION_LOSSES)
+# import tensorflow as tf
+
 def create_centers_regularization_term(config, centers):
     # Add centers regularization
     if config.regularization_factor_centers != 0:
-        with tf.name_scope('centers/Regularizer'):  # following slim's naming convention
-            reg = tf.to_float(config.regularization_factor_centers)
-            centers_reg = tf.identity(reg * tf.nn.l2_loss(centers), name='l2_regularizer')
-            tf.losses.add_loss(centers_reg, tf.GraphKeys.REGULARIZATION_LOSSES)
+        with tf.name_scope('centers/Regularizer'):
+            reg = config.regularization_factor_centers
+            regularizer = tf.keras.regularizers.l2(reg)  # 使用L2正则化器
+            centers_reg = regularizer(centers)
+    else:
+        centers_reg = 0.0  # 无正则化损失
+
+    return centers_reg
 
 
 

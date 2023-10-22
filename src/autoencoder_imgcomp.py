@@ -1,6 +1,6 @@
 import tensorflow as tf
 import os
-from tensorflow.contrib import slim as slim
+# from tensorflow.contrib import slim as slim
 import numpy as np
 
 from collections import namedtuple
@@ -97,28 +97,51 @@ class _Network(object):
 
     @contextmanager
     def _building_ctx(self, scope_name, reuse):
-        with tf.variable_scope(scope_name, reuse=reuse):
-            with slim.arg_scope([slim.conv2d, slim.conv2d_transpose, residual_block],
-                                weights_regularizer=slim.l2_regularizer(self.config.regularization_factor),
-                                data_format='NCHW'):
-                yield  # same as return just returns a generator (=iterator but iterates only once)
+        # 在这里定义卷积层的参数
+        filters = 64
+        kernel_size = (3, 3)
+        
+        with tf.name_scope(scope_name):
+            # 创建卷积层并传递必要的参数
+            conv_layer = tf.keras.layers.Conv2D(filters, kernel_size, kernel_regularizer=tf.keras.regularizers.l2(self.config.regularization_factor), data_format='channels_first')
+            
+            # 在这里使用 conv_layer 创建卷积层
+            yield  # 返回一个生成器
+
+    # def _building_ctx(self, scope_name, reuse):
+    #     with tf.variable_scope(scope_name, reuse=reuse):
+    #         with slim.arg_scope([tf.keras.layers.conv2d, tf.keras.layers.conv2d_transpose, residual_block],
+    #                             weights_regularizer=tf.keras.regularizers.l2(self.config.regularization_factor),
+    #                             data_format='NCHW'):
+    #             yield  # same as return just returns a generator (=iterator but iterates only once)
 
     @contextmanager
-    def _batch_norm_scope(self, is_training):
+    def _batch_norm_scope(self, scope_name, is_training):
         batch_norm_params = self._batch_norm_params(is_training)
-        with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
-                            normalizer_fn=slim.batch_norm,
-                            normalizer_params=batch_norm_params):
-            with slim.arg_scope([slim.batch_norm], **batch_norm_params):
-                yield
+
+        # 在每个需要 BatchNormalization 的卷积层中设置参数
+        # batch_norm_layer = tf.keras.layers.BatchNormalization(**batch_norm_params)
+
+        # 在需要 BatchNormalization 的卷积层中使用 batch_norm_layer
+        with tf.name_scope('scope_name'):
+            conv_layer = tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l2(self.config.regularization_factor),
+                                               data_format='channels_first')
+
+    # def _batch_norm_scope(self, is_training):
+    #     batch_norm_params = self._batch_norm_params(is_training)
+    #     with slim.arg_scope([tf.keras.layers.conv2d, tf.keras.layers.conv2d_transpose],
+    #                         normalizer_fn=tf.keras.layers.BatchNormalization,
+    #                         normalizer_params=batch_norm_params):
+    #         with slim.arg_scope([tf.keras.layers.BatchNormalization], **batch_norm_params):
+    #             yield
 
     @staticmethod
     def _batch_norm_params(is_training):
         return {
-            'decay': 0.9,
+            'momentum': 0.9,
             'epsilon': 1e-5,
             'scale': True,
-            'updates_collections': tf.GraphKeys.UPDATE_OPS,
+            'updates_collections': tf.compat.v1.GraphKeys.UPDATE_OPS,
             'fused': True,
             'is_training': is_training,
             'data_format': 'NCHW',
@@ -218,14 +241,14 @@ class _CVPR(_Network):
 
     def _encode(self, x, is_training):
         n = arch_param_n
-        with self._batch_norm_scope(is_training):
+        with self._batch_norm_scope(SCOPE_AE_ENC,is_training):
             net = self._normalize(x)
-            net = slim.conv2d(net, n // 2, [5, 5], stride=2, scope='h1')
-            net = slim.conv2d(net, n, [5, 5], stride=2, scope='h2')
+            net = tf.keras.layers.conv2d(net, n // 2, [5, 5], stride=2, scope='h1')
+            net = tf.keras.layers.conv2d(net, n, [5, 5], stride=2, scope='h2')
             residual_input_0 = net
             for b in range(self.config.arch_param_B):
                 residual_input_b = net
-                with tf.variable_scope('res_block_enc_{}'.format(b)):
+                with tf.compat.v1.variable_scope('res_block_enc_{}'.format(b)):
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='enc_{}_1'.format(b))
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='enc_{}_2'.format(b))
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='enc_{}_3'.format(b))
@@ -235,7 +258,7 @@ class _CVPR(_Network):
             net = net + residual_input_0
             # BN
             C = self.num_chan_bn_including_heatmap if self.config.heatmap else self.config.num_chan_bn
-            net = slim.conv2d(net, C, [5, 5], stride=2, activation_fn=None, scope='to_bn')
+            net = tf.keras.layers.conv2d(net, C, [5, 5], stride=2, activation_fn=None, scope='to_bn')
             if self.config.heatmap:
                 heatmap = self._get_heatmap3D(bottleneck=net)
                 net = self._mask_with_heatmap(net, heatmap)  # multiply net with mask(heatmap)
@@ -245,15 +268,15 @@ class _CVPR(_Network):
             return EncoderOutput(qout.qbar, qout.qhard, qout.symbols, net, heatmap)
 
     def _decode(self, q, is_training):
-        with self._batch_norm_scope(is_training):
+        with self._batch_norm_scope(SCOPE_AE_DEC,is_training):
             n = arch_param_n
             fa = 3
             fb = 5
-            net = slim.conv2d_transpose(q, n, [fa, fa], stride=2, scope='from_bn')
+            net = tf.keras.layers.Conv2DTranspose(q, n, [fa, fa], stride=2, scope='from_bn')
             residual_input_0 = net
             for b in range(self.config.arch_param_B):
                 residual_input_b = net
-                with tf.variable_scope('res_block_dec_{}'.format(b)):
+                with tf.compat.v1.variable_scope('res_block_dec_{}'.format(b)):
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='dec_{}_1'.format(b))
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='dec_{}_2'.format(b))
                     net = residual_block(net, n, num_conv2d=2, kernel_size=[3, 3], scope='dec_{}_3'.format(b))
@@ -262,8 +285,8 @@ class _CVPR(_Network):
                                  activation_fn=None)
             net = net + residual_input_0
 
-            net = slim.conv2d_transpose(net, n // 2, [fb, fb], stride=2, scope='h12')
-            net = slim.conv2d_transpose(net, 3, [fb, fb], stride=2, scope='h13', activation_fn=None)
+            net = tf.keras.layers.Conv2DTranspose(net, n // 2, [fb, fb], stride=2, scope='h12')
+            net = tf.keras.layers.Conv2DTranspose(net, 3, [fb, fb], stride=2, scope='h13', activation_fn=None)
             net = self._denormalize(net)
             net = self._clip_to_image_range(net)
             return net
@@ -272,18 +295,18 @@ class _CVPR(_Network):
 # ------------------------------------------------------------------------------
 
 
-@slim.add_arg_scope
+# @slim.add_arg_scope
 def residual_block(x, num_outputs, num_conv2d, **kwargs):
     assert 'num_outputs' not in kwargs
     kwargs['num_outputs'] = num_outputs
 
     residual_input = x
-    with tf.variable_scope(kwargs.get('scope', None), 'res'):
+    with tf.compat.v1.variable_scope(kwargs.get('scope', None), 'res'):
         for conv_i in range(num_conv2d):
             kwargs['scope'] = 'conv{}'.format(conv_i + 1)  # name the layer
             if conv_i == (num_conv2d - 1):  # no relu after final conv
                 kwargs['activation_fn'] = None  # zero out the activation fn for last layer
-            x = slim.conv2d(x, **kwargs)
+            x = tf.keras.layers.conv2d(x, **kwargs)
 
         return x + residual_input
 

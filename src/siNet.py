@@ -1,8 +1,8 @@
 from __future__ import division
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+# import tensorflow.contrib.slim as slim
 import numpy as np
-from tensorflow.contrib.layers.python.layers import initializers
+# from tensorflow.contrib.layers.python.layers import initializers
 
 """ This function gets a concatenated (x_dec + y_si) - 6 channel input and returns x_final (3 chanel)"""
 
@@ -23,19 +23,24 @@ def identity_initializer():
 def nm(x):  # changed to None
     w0=tf.Variable(1.0,name='w0')
     w1=tf.Variable(0.0,name='w1')
-    return w0*x+w1*slim.batch_norm(x)
+    #批标准化
+    #创建一个批标准化层
+    batch_norm_layer=tf.keras.layers.BatchNormalization()
+    #使用批标准化处理x
+    return w0*x+w1*batch_norm_layer(x)
+    # return w0*x+w1*slim.batch_norm(x)
 
 
 def siNet(input):
 
-    net=slim.conv2d(input,32,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv1', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=2,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv2', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=4,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv3', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=8,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv4', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=16,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv5', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=32,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv6', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=64,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv7', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=128,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv8', data_format='NCHW')
-    net=slim.conv2d(net,32,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv9', data_format='NCHW')
-    net=slim.conv2d(net,3,[1,1],rate=1,activation_fn=None,scope='g_conv_last', data_format='NCHW')
+    net=tf.keras.layers.conv2d(input,32,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv1', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=2,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv2', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=4,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv3', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=8,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv4', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=16,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv5', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=32,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv6', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=64,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv7', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=128,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv8', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,32,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=None,weights_initializer=identity_initializer(),scope='g_conv9', data_format='NCHW')
+    net=tf.keras.layers.conv2d(net,3,[1,1],rate=1,activation_fn=None,scope='g_conv_last', data_format='NCHW')
     return net

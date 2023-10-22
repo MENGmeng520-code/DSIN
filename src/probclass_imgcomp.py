@@ -82,7 +82,7 @@ class _Network3D(object):
             q_pad = pad_for_probclass3d(
                     q, context_size=self.get_context_size(self.config),
                     pad_value=pad_value, learn_pad_var=False)
-            with tf.variable_scope('logits'):
+            with tf.compat.v1.variable_scope('logits'):
                 # make it into NCHWT, where T is the channel dim of the conv3d
                 q_pad = tf.expand_dims(q_pad, -1, name='NCHWT')
                 logits = self._logits(q_pad, is_training)
@@ -120,7 +120,7 @@ class _Network3D(object):
 
     @contextmanager
     def _building_ctx(self, reuse):
-        with tf.variable_scope(self._PROBCLASS_SCOPE, reuse=reuse):
+        with tf.compat.v1.variable_scope(self._PROBCLASS_SCOPE, reuse=reuse):
             yield
 
     def get_network_variables(self):
@@ -131,7 +131,7 @@ class _Network3D(object):
         """ For accessing logits, mimics the structure of bitcost(...) """
         assert self.reuse, 'Make sure to call bitcost(...) before calling logits(...)'
         with self._building_ctx(reuse=True):
-            with tf.variable_scope('logits'):
+            with tf.compat.v1.variable_scope('logits'):
                 return self._logits(q, is_training)
 
     def _logits(self, q, is_training):
@@ -186,7 +186,7 @@ class _Network3D(object):
         num_outputs = x.shape.as_list()[-1]
         residual_input = x
         activation_fn = tf.nn.relu
-        with tf.variable_scope(name, 'res'):
+        with tf.compat.v1.variable_scope(name, 'res'):
             for conv_i in range(num_conv2d):
                 if conv_i == (num_conv2d - 1):  # no relu after final conv
                     activation_fn = None
@@ -232,7 +232,8 @@ def conv3d(name,
            strides=None,
            activation_fn=tf.nn.relu,
            padding='VALID',
-           weights_initializer=tf.contrib.layers.xavier_initializer(),
+           weights_initializer = tf.initializers.GlorotNormal(),
+        #    weights_initializer=tf.contrib.layers.xavier_initializer(),
            biases_initializer=tf.zeros_initializer(),
            ):
     assert name is not None, 'Need name'
@@ -247,13 +248,19 @@ def conv3d(name,
 
     masked = filter_mask is not None
     scope_name = 'conv3d_{}'.format(name) + ('_mask' if masked else '')
-    with tf.variable_scope(scope_name):
-        weights = tf.get_variable('weights', shape=filter_shape, dtype=tf.float32,
+    with tf.compat.v1.variable_scope(scope_name):
+        # 使用初始化器创建权重变量
+        # weights = tf.Variable(initial_value=weights_initializer(shape=filter_shape), trainable=True, name='weights', dtype=tf.float32)
+
+        weights = tf.compat.v1.get_variable('weights', shape=filter_shape, dtype=tf.float32,
                                   initializer=weights_initializer)
         if filter_mask is not None:
             weights = weights * filter_mask
 
-        biases = tf.get_variable('biases', shape=(num_outputs,), dtype=tf.float32,
+        # 使用初始化器创建偏置变量
+        # biases = tf.Variable(initial_value=biases_initializer(shape=(num_outputs,), dtype=tf.float32), trainable=True, name='biases')
+
+        biases = tf.compat.v1.get_variable('biases', shape=(num_outputs,), dtype=tf.float32,
                                  initializer=biases_initializer)
         out = tf.nn.conv3d(x, weights, strides, padding, name='conv3d')
         out = tf.nn.bias_add(out, biases, name='bias3d')

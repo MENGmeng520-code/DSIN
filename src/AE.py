@@ -4,7 +4,7 @@ import probclass_imgcomp as probclass
 import bits_imgcomp as bits
 from Distortions_imgcomp import *
 
-run_opts = tf.RunOptions(report_tensor_allocations_upon_oom=True)
+run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom=True)
 
 
 class AE(object):
@@ -17,7 +17,7 @@ class AE(object):
         self.AE_only = self.ae_config.AE_only
         if self.AE_only:
             self.si_weight = 0.0
-        else:
+        else:#用边信息，边信息的权重为0.7
             self.si_weight = self.ae_config.si_weight
         self._siNet = siNet
         self._SI_full_img = SI_full_img
@@ -26,6 +26,7 @@ class AE(object):
         self._batch_size = self.ae_config.batch_size if self.AE_only else 1
         self._input_dim_h, self._input_dim_w = self.ae_config.crop_size
         self._y_patch_h, self._y_patch_w = self.ae_config.y_patch_size
+        #训练集1576张图像
         self.num_training_imgs = sum(1 for line in open(cur_dir + ae_config.file_path_train)) // 2
 
         ae_cls = autoencoder.get_network_cls(self.ae_config)
@@ -39,28 +40,38 @@ class AE(object):
 
     def _build_graph(self):
 
-        with tf.variable_scope('ae'):
-            self.x = tf.placeholder(tf.float32, shape=(self._batch_size, 3, self._input_dim_h, self._input_dim_w),
-                                    name='x_placeholder')
-            self.is_training = tf.placeholder(tf.bool, shape=(), name='is_training')
-            self.side_info_placeholder = tf.placeholder(tf.float32, shape=(self._batch_size, 3, None, None),
-                                                        name='side_info_placeholder')
-            self.y_dec = tf.placeholder(tf.float32, shape=(self._batch_size, 3, None, None), name='y_dec_placeholder')
+        with tf.compat.v1.variable_scope('ae'):
+            # 创建输入张量
+            x_shape = (self._batch_size, 3, self._input_dim_h, self._input_dim_w)
+            self.x = tf.Variable(tf.zeros(shape=x_shape, dtype=tf.float32), name='x_placeholder')
+
+            # self.x = tf.compat.v1.placeholder(tf.float32, shape=(self._batch_size, 3, self._input_dim_h, self._input_dim_w),
+            #                         name='x_placeholder')
+
+            # 创建输入张量
+            self.is_training = tf.Variable(True, dtype=tf.bool, name='is_training')
+            self.side_info_placeholder = tf.Variable(tf.zeros((self._batch_size, 3, self._input_dim_h, self._input_dim_w), dtype=tf.float32), name='side_info_placeholder')
+            self.y_dec = tf.Variable(tf.zeros((self._batch_size, 3, self._input_dim_h, self._input_dim_w), dtype=tf.float32), name='y_dec_placeholder')
+
+            # self.is_training = tf.compat.v1.placeholder(tf.bool, shape=(), name='is_training')
+            # self.side_info_placeholder = tf.compat.v1.placeholder(tf.float32, shape=(self._batch_size, 3, None, None),
+            #                                             name='side_info_placeholder')
+            # self.y_dec = tf.compat.v1.placeholder(tf.float32, shape=(self._batch_size, 3, None, None), name='y_dec_placeholder')
             self.mask = tf.constant(self.create_gaussian_masks()) if self.use_y_gauss_mask else 1
 
-        with tf.variable_scope('encoder'):
-            with tf.variable_scope("encoder_body", reuse=False):
+        with tf.compat.v1.variable_scope('encoder'):
+            with tf.compat.v1.variable_scope("encoder_body", reuse=False):
                 self.z = self._encode(self.x, self.ae_imgcomp, is_training=self.is_training)
 
-        with tf.variable_scope('decoder'):
+        with tf.compat.v1.variable_scope('decoder'):
             self.x_dec = self._decode(self.z.qbar, self.ae_imgcomp, is_training=self.is_training)
 
-        with tf.variable_scope('siFinder'):
+        with tf.compat.v1.variable_scope('siFinder'):
             self.y_syn, self.ncc, self.extermum_ncc, self.q, self.r, self.row, self.col, self.x_patches, self.y_patches = self._SI_full_img(
                 self.x_dec, self.side_info_placeholder, self.mask, self._y_patch_h, self._y_patch_w, self.ae_config,
                 self.y_dec)
 
-        with tf.variable_scope('siNetwork'):
+        with tf.compat.v1.variable_scope('siNetwork'):
             if self.AE_only:
                 self.x_with_si = tf.zeros_like(self.x)
             else:
@@ -68,7 +79,7 @@ class AE(object):
                                    axis=1)  # [N,6,H,W]
                 self.x_with_si = self.denormalize(self._siNet(concat))  # output shape [N,3,H,W]
 
-        with tf.variable_scope('imgcomp'):
+        with tf.compat.v1.variable_scope('imgcomp'):
             # Train part:
             # stop_gradient is beneficial for training. it prevents multiple gradients flowing into the heatmap.
             pc_in = tf.stop_gradient(self.z.qbar)
@@ -90,7 +101,7 @@ class AE(object):
                 self.ae_config, self.ae_imgcomp, self.pc_imgcomp, (1 - self.si_weight) * d_train.d_loss_scaled,
                 bc_test, self.z.heatmap)
 
-        with tf.variable_scope('loss'):
+        with tf.compat.v1.variable_scope('loss'):
             loss_siNet = tf.losses.absolute_difference(self.x, self.x_with_si) if not self.AE_only else 0
             if not self.AE_only and self.ae_config.batch_size > 1:
                 self.loss_train = (self.total_loss + self.si_weight * loss_siNet) / float(self.ae_config.batch_size)
@@ -98,7 +109,7 @@ class AE(object):
                 self.loss_train = (self.total_loss + self.si_weight * loss_siNet)
             self.loss_test = self.total_loss_test + self.si_weight * loss_siNet
 
-        with tf.variable_scope('training-step'):
+        with tf.compat.v1.variable_scope('training-step'):
             self.train_op_imgcomp, self.global_step = \
                 self.get_train_op(self.ae_config, self.pc_config, self.pc_imgcomp.variables(), self.loss_train)
 

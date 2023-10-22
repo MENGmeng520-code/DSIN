@@ -75,7 +75,7 @@ class Distortions(object):
                 # Values are expected to be in 0...255, i.e., uint8, but tf.square does not support uint8's
                 inp, otp = tf.cast(inp, tf.int32), tf.cast(otp, tf.int32)
             abs_error = tf.abs(otp - inp)
-            abs_error_float = tf.to_float(abs_error)
+            abs_error_float = tf.compat.v1.to_float(abs_error)
             mae_per_image = tf.reduce_mean(abs_error_float, axis=[1, 2, 3])
             return mae_per_image
 
@@ -94,7 +94,7 @@ class Distortions(object):
                 # Values are expected to be in 0...255, i.e., uint8, but tf.square does not support uint8's
                 inp, otp = tf.cast(inp, tf.int32), tf.cast(otp, tf.int32)
             squared_error = tf.square(otp - inp)
-            squared_error_float = tf.to_float(squared_error)
+            squared_error_float = tf.compat.v1.to_float(squared_error)
             mse_per_image = tf.reduce_mean(squared_error_float, axis=[1, 2, 3])
             return mse_per_image
 

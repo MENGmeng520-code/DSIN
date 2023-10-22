@@ -28,14 +28,16 @@ def main(run_dict):
     iter = run_dict['total_iterations']
     now = datetime.datetime.today().strftime('%d%m%Y-%H%M')
 
-    tf.reset_default_graph()
-    cur_dir = os.getcwd() + '/data_paths/'
+    tf.compat.v1.reset_default_graph()
+    cur_dir = os.getcwd() + '/src/data_paths/'
+    #重点：定义自编码器（包括encoder, decoder, siFinder, siNetwork, imgcomp, loss, training-step）
     ae = AE(run_dict['ae_config'], run_dict['pc_config'], encoder, decoder, siFinder, SI_full_img, siNet, cur_dir)
     data = Dataset(run_dict['ae_config'], cur_dir)
 
     val_names, test_names = data.get_data_size()
     val_iterations = len(val_names) // run_dict['batch_size']
-
+    
+    # 自编码器ae加载模型
     if run_dict['load_model']:
         model_name = run_dict['load_model_name']
         ae.load_model(run_dict['root_weights'] + model_name + '/model')
@@ -44,7 +46,7 @@ def main(run_dict):
 
     if run_dict['train_model']:
         lr = run_dict['ae_config'].lr_initial, run_dict['pc_config'].lr_initial
-        tbar = tqdm(range(1, run_dict['total_iterations'] + 1))
+        tbar = tqdm(range(1, run_dict['total_iterations'] + 1))# 显示进度条
 
         for iteration in tbar:
             data_np_train = data.get_data_for_train()
@@ -214,10 +216,10 @@ current_directory = os.getcwd()
 parser = argparse.ArgumentParser()
 parser.add_argument('-ae_config', '-ae_configs', '--ae_config_path', '--ae_configs_path', type=str,
                     help='AE config file path',
-                    default=current_directory + '/run_configs/ae_run_configs')
+                    default=current_directory + '/src/run_configs/ae_run_configs')
 parser.add_argument('-pc_config', '-pc_configs', '--pc_config_path', '--pc_configs_path', type=str,
                     help='PC config file path',
-                    default=current_directory + '/run_configs/pc_run_configs')
+                    default=current_directory + '/src/run_configs/pc_run_configs')
 args = parser.parse_args()
 
 if __name__ == '__main__':

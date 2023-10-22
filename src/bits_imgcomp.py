@@ -11,7 +11,7 @@ def bitcost_to_bpp(bit_cost, input_batch):
         bit_cost, input_batch)
     with tf.name_scope('bitcost_to_bpp'):
         num_bits = tf.reduce_sum(bit_cost, name='num_bits')
-        return num_bits / tf.to_float(num_pixels_in_input_batch(input_batch))
+        return num_bits / tf.compat.v1.to_float(num_pixels_in_input_batch(input_batch))
 
 
 def num_pixels_in_input_batch(input_batch):
