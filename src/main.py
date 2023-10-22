@@ -30,7 +30,7 @@ def main(run_dict):
 
     tf.compat.v1.reset_default_graph()
     cur_dir = os.getcwd() + '/src/data_paths/'
-    #重点：定义自编码器（包括encoder, decoder, siFinder, siNetwork, imgcomp, loss, training-step）
+    #重点：定义自编码器（包括ae_run_config文件内容，pc_run_config文件内容，encoder_imgcomp.encoder, decoder_imgcomp.decoder, siFinder.siFinder, siFull_img.SI_full_img, siNet.siNet, os.getcwd() + '/src/data_paths/'）
     ae = AE(run_dict['ae_config'], run_dict['pc_config'], encoder, decoder, siFinder, SI_full_img, siNet, cur_dir)
     data = Dataset(run_dict['ae_config'], cur_dir)
 
@@ -43,16 +43,16 @@ def main(run_dict):
         ae.load_model(run_dict['root_weights'] + model_name + '/model')
         iter = 'NA'
         lr = ('NA', 'NA')
-
+    #训练模型
     if run_dict['train_model']:
         lr = run_dict['ae_config'].lr_initial, run_dict['pc_config'].lr_initial
         tbar = tqdm(range(1, run_dict['total_iterations'] + 1))# 显示进度条
 
         for iteration in tbar:
-            data_np_train = data.get_data_for_train()
+            data_np_train = data.get_data_for_train()#获得训练数据
 
             x_train, y_train = data_np_train  # data_np_train is (x,y) tuple
-            train_loss, bpp = ae.siNet_update(x_train, y_train)
+            train_loss, bpp = ae.siNet_update(x_train, y_train)# 预处理边信息y，如果不使用边信息，就将siNet输出替换为相同大小的0张量
 
             train_sum += train_loss
             bpp_sum += bpp
@@ -62,24 +62,24 @@ def main(run_dict):
                 run_dict['validate_every'], val_phase_one, val_phase_two = \
                     get_validate_every(iteration, run_dict['total_iterations'], run_dict['validate_every'],
                                        val_phase_one, val_phase_two)
-
+            #每run_dict['validate_every']次进行验证集验证
             if iteration != 0 and iteration % run_dict['validate_every'] == 0:
                 """ validation step """
                 val_sum = 0
-                for i in range(val_iterations):
-                    data_np_val = data.get_data_for_val()
+                for i in range(val_iterations):#每次验证迭代
+                    data_np_val = data.get_data_for_val()#获得验证集数据
                     x_val, y_val = data_np_val  # data_np_val is (x,y) tuple
                     val_loss = ae.siNet_validate(x_val, y_val)
-                    val_sum += val_loss
+                    val_sum += val_loss#计算验证集损失
 
                 val_loss = val_sum / float(val_iterations)
                 val_loss_history.append(val_loss)
                 val_iters.append(iteration)
-
+                #记录最好验证集的最好结果
                 if val_loss < best_val:
                     best_val, iter = val_loss, iteration
                     if run_dict['save_model']:
-
+                        #保存模型
                         model_name = save_model_fn(ae, run_dict['ae_config'], run_dict['pc_config'],
                                                    run_dict['root_weights'], now, iteration,
                                                    run_dict['total_iterations'], best_val, run_dict['save_config'])
@@ -91,15 +91,15 @@ def main(run_dict):
                                                                         bpp_sum, val_loss, tbar)
                 train_sum = 0.0
                 bpp_sum = 0.0
-
+        #训练结束，画出训练集、验证集的损失图
         if run_dict['plot_loss_graph']:
             """ plot train + val loss_train (if train_model=True) """
             plot_loss(train_loss_history, val_loss_history, val_iters, train_iters, run_dict['total_iterations'],
                       best_val, iter, model_name)
-
+            #保存图片
             if run_dict['save_loss_graph']:
                 plt.savefig(run_dict['root_save_img'] + 'images/loss_' + model_name + '.png')
-
+    #测试模型
     if run_dict['test_model']:
 
         for i in range(len(test_names)):
@@ -107,27 +107,27 @@ def main(run_dict):
             data_np_test = data.get_data_for_test()
 
             x_test, y_test = data_np_test  # data_np_test is (x,y) tuple
-            y_dec, y_syn, x_dec, x_with_si, bpp = ae.siNet_get_reconstructed(x_test, y_test)
-            x_dec = np.clip(x_dec, 0, 255)
+            y_dec, y_syn, x_dec, x_with_si, bpp = ae.siNet_get_reconstructed(x_test, y_test)#重构
+            x_dec = np.clip(x_dec, 0, 255)#裁剪出0-255之间的值
             x_with_si = np.clip(x_with_si, 0, 255)
 
             img_index = 0  # test image index to present within the batch
-            if run_dict['plot_test_img']:
+            if run_dict['plot_test_img']:#画图对比：原始+重构图
                 """ show orig + decoded images """
                 plot_inference(x_test[img_index], x_dec[img_index], y_test[img_index], y_syn[img_index],
                                x_with_si[img_index], model_name, run_dict['total_iterations'], iter, lr, bpp)
 
-            if run_dict['save_test_img']:
+            if run_dict['save_test_img']:#保存图片
                 save_test_imgs_fn(run_dict['root_save_img'], model_name, x_with_si[img_index], i, bpp)
 
-            if run_dict['create_loss_list']:
+            if run_dict['create_loss_list']:#保存率损失数据
                 x_rec = x_with_si
                 if np.average(x_rec[img_index]) == 0:  # if no si (i.e. x_si will be zero) --> use x_dec
                     x_rec = x_dec
                 loss_list_saver(x_test, y_test, x_rec, y_syn, run_dict['batch_size'], str(model_name), bpp,
                                 run_dict['root_save_img'])
 
-
+#获得多少次进行一次验证
 def get_validate_every(iteration, total_iterations, validate_every, val_phase_one, val_phase_two):
 
     if iteration > (total_iterations // 2) and val_phase_one is False:
@@ -139,7 +139,7 @@ def get_validate_every(iteration, total_iterations, validate_every, val_phase_on
 
     return validate_every, val_phase_one, val_phase_two
 
-
+#保存模型
 def save_model_fn(ae, ae_config, pc_config, root_weights, now, iteration, total_iterations, best_val, save_config):
 
     target_bpp = ae_config.H_target/(64./ae_config.num_chan_bn)
@@ -166,7 +166,7 @@ def save_model_fn(ae, ae_config, pc_config, root_weights, now, iteration, total_
 
     return model_name
 
-
+#输出loss，bpp数据
 def print_to_console(show_every, train_sum, train_loss_history, train_iters, iteration, bpp_sum, val_loss, tbar):
 
     train_loss = train_sum / float(show_every)
@@ -180,9 +180,9 @@ def print_to_console(show_every, train_sum, train_loss_history, train_iters, ite
 
     return bpp, train_loss_history, train_iters
 
-
+#从config读出参数
 def get_run_params(current_directory):
-
+    #ae_config是ae_run_config文件中的内容
     ae_config, ae_config_rel_path = config_parser.parse(args.ae_config_path)
     pc_config, pc_config_rel_path = config_parser.parse(args.pc_config_path)
     run_dict = {'ae_config': ae_config,

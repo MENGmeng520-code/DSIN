@@ -8,7 +8,7 @@ run_opts = tf.compat.v1.RunOptions(report_tensor_allocations_upon_oom=True)
 
 
 class AE(object):
-
+    #ae_run_config文件内容，pc_run_config文件内容，encoder_imgcomp.encoder, decoder_imgcomp.decoder, siFinder.siFinder, siFull_img.SI_full_img, siNet.siNet, os.getcwd() + '/src/data_paths/'
     def __init__(self, ae_config, pc_config, encoder, decoder, siFinder, SI_full_img, siNet, cur_dir):
         self.ae_config = ae_config
         self.pc_config = pc_config
@@ -117,7 +117,7 @@ class AE(object):
         self.sesh.run(tf.global_variables_initializer(), options=run_opts)
 
     def siNet_update(self, x, y):
-        if not self.AE_only:
+        if not self.AE_only:#有边信息
             y_dec = self.create_y_dec(y)
             _, _, loss, bpp = self.sesh.run([self.train_op_imgcomp, self.global_step, self.loss_train, self.bpp_train],
                                             feed_dict={self.x: x, self.side_info_placeholder: y, self.y_dec: y_dec,
